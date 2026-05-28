@@ -11,16 +11,26 @@ app.use(express.json());
 
 const PORT = 3000;
 
-// Initialize Google GenAI client
-// User-Agent: 'aistudio-build' is required for telemetry
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      "User-Agent": "aistudio-build",
-    },
-  },
-});
+// Initialize Google GenAI client lazily to support dynamic environment settings
+let aiClient: GoogleGenAI | null = null;
+
+function getAi(): GoogleGenAI {
+  if (!aiClient) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY environment variable is not configured. Please add it via Settings > Secrets.");
+    }
+    aiClient = new GoogleGenAI({
+      apiKey: apiKey,
+      httpOptions: {
+        headers: {
+          "User-Agent": "aistudio-build",
+        },
+      },
+    });
+  }
+  return aiClient;
+}
 
 // JSON Schema for space flashcards
 const flashcardSchema = {
@@ -67,7 +77,7 @@ app.post("/api/generate-card", async (req, res) => {
 It should be highly engaging and suitable for a middle school/high school student, especially inspiring young women to get excited about physics, astronomy, and STEM.
 Strictly categorize it into one of: 'pioneers' (astronomers, female space scientists, astronauts), 'wonders' (nebulae, black holes, moons, stars), 'quests' (space flights, telescopes, mars rovers), or 'tech' (rockets, pressure suits, modules).`;
 
-    const response = await ai.models.generateContent({
+    const response = await getAi().models.generateContent({
       model: "gemini-3.5-flash",
       contents: prompt,
       config: {
@@ -82,7 +92,7 @@ Strictly categorize it into one of: 'pioneers' (astronomers, female space scient
     res.json({ success: true, card: cardData });
   } catch (error: any) {
     console.error("Gemini Card Generation Error:", error);
-    res.status(500).json({ error: "Oops! The cosmos got a bit tangled up. Please try again in a moment." });
+    res.status(500).json({ error: error.message || "Oops! The cosmos got a bit tangled up. Please try again in a moment." });
   }
 });
 
@@ -95,16 +105,41 @@ app.post("/api/stella-chat", async (req, res) => {
   }
 
   try {
+    // Gemini API requires conversational flow to strictly start with 'user'
+    // and alternate between 'user' and 'model' (with no consecutives of the same type)
+    const sanitizedMessages: { role: string; text: string }[] = [];
+    for (const msg of messages) {
+      if (!msg.text || typeof msg.text !== "string" || msg.text.trim() === "") continue;
+      const role = msg.role === "model" ? "model" : "user";
+      
+      if (sanitizedMessages.length === 0) {
+        if (role === "user") {
+          sanitizedMessages.push({ role, text: msg.text });
+        }
+      } else {
+        const lastMsg = sanitizedMessages[sanitizedMessages.length - 1];
+        if (lastMsg.role === role) {
+          // Merge consecutive messages from same role
+          lastMsg.text += "\n" + msg.text;
+        } else {
+          sanitizedMessages.push({ role, text: msg.text });
+        }
+      }
+    }
+
+    if (sanitizedMessages.length === 0) {
+      return res.status(400).json({ error: "Please send a message from the user." });
+    }
+
     // Format messages for @google/genai SDK
-    // The SDK expects contents to represent history
-    const contents = messages.map((m) => {
+    const contents = sanitizedMessages.map((m) => {
       return {
-        role: m.role || "user",
+        role: m.role,
         parts: [{ text: m.text }],
       };
     });
 
-    const response = await ai.models.generateContent({
+    const response = await getAi().models.generateContent({
       model: "gemini-3.5-flash",
       contents: contents,
       config: {
@@ -120,7 +155,7 @@ Keep your answers relatively concise, warm, and highly conversational.`,
     res.json({ success: true, response: response.text });
   } catch (error: any) {
     console.error("Stella Chat Error:", error);
-    res.status(500).json({ error: "Stella is currently gazing through a telescope. Please try asking again in a moment!" });
+    res.status(500).json({ error: error.message || "Stella is currently gazing through a telescope. Please try asking again in a moment!" });
   }
 });
 

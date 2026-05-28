@@ -96,7 +96,7 @@ export default function AstroGuide({ onCardAdded, generatedTopics, setGeneratedT
       }
     } catch (err: any) {
       console.error(err);
-      setChatError("Oh dear, the communication beacon is offline. Try checking again shortly! ✨");
+      setChatError(err.message || "Oh dear, the communication beacon is offline. Try checking again shortly! ✨");
     } finally {
       setIsChatLoading(false);
     }
@@ -141,7 +141,7 @@ export default function AstroGuide({ onCardAdded, generatedTopics, setGeneratedT
       }
     } catch (err: any) {
       console.error(err);
-      setLabError("Oh, the cosmic forge is experiencing zero-gravity turbulence. Try another topic! 😊");
+      setLabError(err.message || "Oh, the cosmic forge is experiencing zero-gravity turbulence. Try another topic! 😊");
     } finally {
       setIsLabGenerating(false);
     }
