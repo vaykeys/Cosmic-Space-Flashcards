@@ -1,0 +1,8 @@
+{
+  "name": "Cosmic Space Flashcards",
+  "description": "An interactive, color-coded flashcard exploration game with a helpful AI space mentor to learn about historic missions, astronomers, and wonders of the universe.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
