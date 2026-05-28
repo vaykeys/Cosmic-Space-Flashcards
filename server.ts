@@ -180,6 +180,10 @@ async function startApp() {
   });
 }
 
-startApp().catch((err) => {
-  console.error("Failed to start application:", err);
-});
+if (!process.env.VERCEL) {
+  startApp().catch((err) => {
+    console.error("Failed to start application:", err);
+  });
+}
+
+export default app;
